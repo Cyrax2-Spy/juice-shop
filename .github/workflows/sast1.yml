@@ -36,6 +36,7 @@ jobs:
           DURATION=$(python3 -c "print(round($END_TIME - $START_TIME, 3))")
           echo "{\"tool\": \"semgrep\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > semgrep-timing.json
           cat semgrep-timing.json
+
       - name: Upload Semgrep Reports & Timing Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -44,6 +45,7 @@ jobs:
             semgrep-report.json
             semgrep-report.sarif
             semgrep-timing.json
+
   bandit-scan:
     name: Bandit SAST Benchmark
     runs-on: ubuntu-latest
@@ -68,6 +70,7 @@ jobs:
           DURATION=$(python3 -c "print(round($END_TIME - $START_TIME, 3))")
           echo "{\"tool\": \"bandit\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > bandit-timing.json
           cat bandit-timing.json
+
       - name: Upload Bandit Reports & Timing Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,6 +79,7 @@ jobs:
             bandit-report.json
             bandit-report.sarif
             bandit-timing.json
+
   sonarqube-scan:
     name: SonarQube SAST Benchmark
     runs-on: ubuntu-latest
@@ -89,105 +93,7 @@ jobs:
         run: |
           START_TIME=$(date +%s.%N)
           echo "SONAR_START_TIME=$START_TIME" >> "$GITHUB_ENV"
-      - name: Scan with SonarQube Scanner Action
-        uses: SonarSource/sonarqube-scan-action@v7
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.organization=cyrax2-spy
-            -Dsonar.projectKey=name: SAST Empirical Benchmark
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch: # Allows you to trigger scans manually with one click
-
-permissions:
-  contents: read
-  security-events: write
-
-jobs:
-  semgrep-scan:
-    name: Semgrep SAST Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Semgrep
-        run: pip install semgrep
-
-      - name: Run Semgrep & Measure Execution Time
-        run: |
-          START_TIME=$(date +%s.%N)
-          semgrep scan --config auto --json --output semgrep-report.json . || true
-          semgrep scan --config auto --sarif --output semgrep-report.sarif . || true
-          END_TIME=$(date +%s.%N)
-          DURATION=$(python3 -c "print(round($END_TIME - $START_TIME, 3))")
-          echo "{\"tool\": \"semgrep\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > semgrep-timing.json
-          cat semgrep-timing.json
-      - name: Upload Semgrep Reports & Timing Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: semgrep-benchmark-results
-          path: |
-            semgrep-report.json
-            semgrep-report.sarif
-            semgrep-timing.json
-  bandit-scan:
-    name: Bandit SAST Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Bandit
-        run: pip install bandit[sarif]
-
-      - name: Run Bandit & Measure Execution Time
-        run: |
-          START_TIME=$(date +%s.%N)
-          bandit -r . -f json -o bandit-report.json || true
-          bandit -r . -f sarif -o bandit-report.sarif || true
-          END_TIME=$(date +%s.%N)
-          DURATION=$(python3 -c "print(round($END_TIME - $START_TIME, 3))")
-          echo "{\"tool\": \"bandit\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > bandit-timing.json
-          cat bandit-timing.json
-      - name: Upload Bandit Reports & Timing Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-benchmark-results
-          path: |
-            bandit-report.json
-            bandit-report.sarif
-            bandit-timing.json
-  sonarqube-scan:
-    name: SonarQube SAST Benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Record SonarQube Start Time
-        run: |
-          START_TIME=$(date +%s.%N)
-          echo "SONAR_START_TIME=$START_TIME" >> "$GITHUB_ENV"
       - name: Scan with SonarQube Scanner Action
         uses: SonarSource/sonarqube-scan-action@v7
         env:
@@ -197,6 +103,7 @@ jobs:
           args: >
             -Dsonar.organization=cyrax2-spy
             -Dsonar.projectKey=Cyrax2-Spy_juice-shop
+
       - name: Measure SonarQube Execution Time
         if: always()
         run: |
@@ -204,20 +111,7 @@ jobs:
           DURATION=$(python3 -c "print(round($END_TIME - float('${{ env.SONAR_START_TIME }}'), 3))")
           echo "{\"tool\": \"sonarqube\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > sonarqube-timing.json
           cat sonarqube-timing.json
-      - name: Upload SonarQube Timing Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sonarqube-benchmark-results
-          path: |
-            sonarqube-timing.json
-      - name: Measure SonarQube Execution Time
-        if: always()
-        run: |
-          END_TIME=$(date +%s.%N)
-          DURATION=$(python3 -c "print(round($END_TIME - float('${{ env.SONAR_START_TIME }}'), 3))")
-          echo "{\"tool\": \"sonarqube\", \"repo\": \"$GITHUB_REPOSITORY\", \"duration_seconds\": $DURATION}" > sonarqube-timing.json
-          cat sonarqube-timing.json
+
       - name: Upload SonarQube Timing Artifact
         if: always()
         uses: actions/upload-artifact@v4
